@@ -1,0 +1,140 @@
+#include <ThingerESP8266.h>
+#include <ESP8266WiFi.h>
+#include <Wire.h>
+#include <Adafruit_MLX90614.h>
+#define USERNAME "choudharyas"
+#define DEVICE_ID "NodeMCU"
+#define DEVICE_CREDENTIAL "FcLySVkP8YFR"
+#define EMAIL_ENDPOINT "IFTTT"
+#define SSID "Galaxy-M20"
+#define SSID_PASSWORD "ac312124"
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
+ThingerESP8266 thing(USERNAME, DEVICE_ID, DEVICE_CREDENTIAL);
+int  Temperature:
+char tag[] = "180088FECCA2"; // Replace with your own Tag ID
+char input[12];        // A variable to store the Tag ID being presented
+int count = 0;        // A counter variable to navigate through the input[] character array
+boolean flag = 0;     // A variable to store the Tag match status
+const int trigPin = 5;
+const int echoPin = 6;
+long duration;
+int distance;
+String RfidReading;
+float TempReading;
+void setup()
+{
+  Serial.begin(9600);   // Initialise Serial Communication with the Serial Monitor
+  thing.add_wifi(SSID, SSID_PASSWORD);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  mlx.begin();
+  Initialize_streamer();
+  Serial.begin(115200);
+  thing.add_wifi(SSID, SSID_PASSWORD);
+  if (!MLX.begin()) {
+  Serial.println("Could not find a valid BMP085 sensor, check wiring!");
+  while (1) {}
+  }
+}
+void loop()
+{
+ Temperature = bmp.readTemperature();
+  thing["data"] >> [](pson& out){
+    out["Temperature"] = bmp.readTemperature();
+     };
+  thing.handle();
+  thing.stream(thing["data"]);
+  if(Temperature > 99){
+     thing.call_endpoint( EMAIL_ENDPOINT,"data");}
+  Serial.print("Sending Data");
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration * 0.0340 / 2;
+  // Serial.println("Distance");
+  //Serial.println(distance);
+  if (distance >= 99) {
+    reader();
+    Temperature = bmp.readTemperature();
+    thing["data"] >> [](pson & out) {
+      out["temperature"] = bmp.readPressure() / 100;
+    }
+    delay(1000);
+  }
+  void reader()
+  {
+    if (Serial.available()) // Check if there is incoming data in the RFID Reader Serial Buffer.
+    {
+      count = 0; // Reset the counter to zero
+      while (Serial.available() && count < 12)
+      {
+        input[count] = Serial.read(); // Read 1 Byte of data and store it in the input[] variable
+        count++; // increment counter
+        delay(5);
+      }
+      if (count == 12) //
+      {
+        count = 0; // reset counter varibale to 0
+        flag = 1;
+        while (count < 12 && flag != 0)
+        {
+          if (input[count] == tag[count])
+            flag = 1; // everytime the values match, we set the flag variable to 1
+          else
+            flag = 0;
+          count++; // increment i
+          RfidReading = "Ashish";
+        }
+      }
+      if (flag == 1) // If flag variable is 1, then it means the tags match
+      {
+        //Serial.println("Access Allowed!");
+        temp_read();
+        Write_streamer();
+      }
+      else
+      {
+        // Serial.println("Access Denied"); // Incorrect Tag Message
+      }
+      for (count = 0; count < 12; count++)
+      {
+        input[count] = 'F';
+      }
+      count = 0; // Reset counter variable
+    }
+  }
+  void temp_read()
+  {
+    TempReading = mlx.readObjectTempC();
+    // Serial.println(sensorReading1);
+    // Serial.print(",");
+    //Serial.print("Ambient ");
+    //Serial.print(mlx.readAmbientTempC());
+    //Serial.print(" C");
+    // Serial.print("Target  ");
+    // Serial.print(mlx.readObjectTempC());
+    // Serial.print(" C");
+    // delay(1000);
+  }
+  void Initialize_streamer()
+  {
+    Serial.println("CLEARDATA"); //clears up any data left from previous projects
+    Serial.println("LABEL,Date,Time,Temperature,Name"); //always write LABEL, to indicate it as first line
+  }
+  void Write_streamer()
+  {
+    // Serial.print("DATA"); //always write "DATA" to Indicate the following as Data
+    // Serial.print(","); //Move to next column using a ","
+    //  Serial.print("DATE"); //Store date on Excel
+    // Serial.print(","); //Move to next column using a ","
+    // Serial.print("TIME"); //Store date on Excel
+    // Serial.print(","); //Move to next column using a ","
+    Serial.print(RfidReading); //Store date on Excel
+    Serial.print(","); //Move to next column using a ","
+    Serial.print(TempReading); //Store date on Excel
+    Serial.print(","); //Move to next column using a ","
+    Serial.println(); //End of Row move to next row
+  }
